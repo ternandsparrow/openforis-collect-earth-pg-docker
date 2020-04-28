@@ -1,0 +1,43 @@
+version: '3.7'
+services:
+  database:
+    image: postgis/postgis:9.6-3.0-alpine
+    container_name: collectearth-db
+    environment:
+      # these DB details must match the 'pgbackups3' service
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_DB: ${DB_NAME}
+      POSTGRES_PASSWORD: ${DB_PASS}
+    ports:
+     - "5432:5432"
+    restart: unless-stopped
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -h database -p 5432 -d $POSTGRES_DB"]
+      interval: 30s
+      timeout: 30s
+      retries: 150
+
+  pgbackups3:
+    image: schickling/postgres-backup-s3
+    container_name: collectearth-pgbackups3
+    links:
+      - database
+    restart: unless-stopped
+    environment:
+      SCHEDULE: ${DB_BACKUP_CRON_SCHEDULE}
+      S3_REGION: ${S3_REGION}
+      S3_ACCESS_KEY_ID: ${AWS_ACCESS_KEY_ID}
+      S3_SECRET_ACCESS_KEY: ${AWS_SECRET_ACCESS_KEY}
+      S3_BUCKET: ${S3_BUCKET}
+      S3_PREFIX: collectearth-backup
+      POSTGRES_HOST: database
+      # these DB details must match the 'database' service
+      POSTGRES_DATABASE: ${DB_NAME}
+      POSTGRES_USER: ${DB_USER}
+      POSTGRES_PASSWORD: ${DB_PASS}
+      POSTGRES_EXTRA_OPTS: '--schema=public --blobs'
+
+volumes:
+  pgdata:
